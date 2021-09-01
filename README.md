@@ -1,63 +1,103 @@
 # tanzu-spring-cloud-gateway
 
-A guided tutorial for experimenting with Tanzu Spring Cloud Gateway on your laptop using a docker desktop k8s cluster.
+A guided tutorial for experimenting with Tanzu Spring Cloud Gateway on minikube.
 
-## Prerequisites
-
-* [kubectl](https://kubernetes.io/docs/tasks/tools/install-kubectl/)
-* [kustomize](https://kubectl.docs.kubernetes.io/installation/kustomize/) 
-* [helm](https://helm.sh/docs/intro/install/#through-package-managers)
-* [Tanzu Network Account](https://network.pivotal.io/) so you can download Spring Cloud Gateway for Kuberentes 
-
-### MacOS 
-
-* [docker desktop](https://www.docker.com/products/docker-desktop) with the 
-  built-in k8s [MacOS k8s instructions](https://docs.docker.com/docker-for-mac/kubernetes/) 
-
-### Windows 
-
-* Windows subsystem for Linux since there are bash scripts that need to be run 
-*  [docker desktop](https://www.docker.com/products/docker-desktop) with the
-   built-in k8s [Windows k8s instructions](https://docs.docker.com/docker-for-windows/kubernetes/)
    
-### Validate prerequisites
+## Launch minikube 
 
-1. Validate your kubectl is pointing at the docker desktop built in k8s. execute `kubectl cluster-info` 
-   you should see output similar to what is below 
+We will use minikube for this lab, configured to run with 8 CPUs and 16GB of RAM. 
 
-```text
-Kubernetes control plane is running at https://kubernetes.docker.internal:6443
-KubeDNS is running at https://kubernetes.docker.internal:6443/api/v1/namespaces/kube-system/services/kube-dns:dns/proxy
+1. Open a terminal window
+2. rung the shell script `./start-minkube.sh` to launch minikube, this step can take a couple of minutes, you know it worked when
+you see output similar to below.
 
-To further debug and diagnose cluster problems, use 'kubectl cluster-info dump'.
+```
+😄  minikube v1.22.0 on Ubuntu 20.04 (xen/amd64)
+🆕  Kubernetes 1.21.2 is now available. If you would like to upgrade, specify: --kubernetes-version=v1.21.2
+✨  Using the docker driver based on existing profile
+❗  Your cgroup does not allow setting memory.
+    ▪ More information: https://docs.docker.com/engine/install/linux-postinstall/#your-kernel-does-not-support-cgroup-swap-limit-capabilities
+❗  Your cgroup does not allow setting memory.
+    ▪ More information: https://docs.docker.com/engine/install/linux-postinstall/#your-kernel-does-not-support-cgroup-swap-limit-capabilities
+👍  Starting control plane node minikube in cluster minikube
+🚜  Pulling base image ...
+🔄  Restarting existing docker container for "minikube" ...
+🐳  Preparing Kubernetes v1.20.10 on Docker 20.10.7 ...
+🔎  Verifying Kubernetes components...
+    ▪ Using image gcr.io/k8s-minikube/storage-provisioner:v5
+🌟  Enabled addons: storage-provisioner, default-storageclass
+🏄  Done! kubectl is now configured to use "minikube" cluster and "default" namespace by default
 ```
 
-2. check the version of helm you have installed using the command `helm version` this workshop has been tested with `version.BuildInfo{Version:"v3.5.0",GitCommit:"32c22239423b3b4ba6706d450bd044baffdcf9e6", GitTreeState:"dirty", GoVersion:"go1.15.6"}` earlier versions might not work.
+3. Validate that minikube is running by executing `kubectl get nodes` you should see output similar to below
+```
+NAME       STATUS   ROLES                  AGE   VERSION
+minikube   Ready    control-plane,master   29m   v1.20.10
+```
 
-3. check the version of kustomize using the command `kustomize version` the workshop is tested with version 3.9.2
+## Point docker cli at the docker registry in minikube
+
+To keep things simple for the lab we are going to use a the docker regstiry running
+inside minikube. We are going to need to tell the docker cli to use this registry.
+
+1. execute the command `minikube docker-env` you will see output similat to the one below
+```
+export DOCKER_TLS_VERIFY="1"
+export DOCKER_HOST="tcp://192.168.49.2:2376"
+export DOCKER_CERT_PATH="/home/ubuntu/.minikube/certs"
+export MINIKUBE_ACTIVE_DOCKERD="minikube"
+
+# To point your shell to minikube's docker-daemon, run:
+# eval $(minikube -p minikube docker-env)
+```
+The environment variables printed by this command point the docker cli to minikube.
+
+2. Execute the command `eval $(minikube -p minikube docker-env)` to point the docker cli to the registry inside minikube
+
+3. validate the configured by executing the command `docker images` you should the images listed below in the output below.
+
+```
+REPOSITORY                                TAG        IMAGE ID       CREATED         SIZE
+k8s.gcr.io/kube-proxy                     v1.20.10   945c9bce487a   2 weeks ago     99.7MB
+k8s.gcr.io/kube-controller-manager        v1.20.10   2f450864515d   2 weeks ago     116MB
+k8s.gcr.io/kube-apiserver                 v1.20.10   644cadd07add   2 weeks ago     122MB
+k8s.gcr.io/kube-scheduler                 v1.20.10   4c9be8dc650b   2 weeks ago     47.3MB
+gcr.io/k8s-minikube/storage-provisioner   v5         6e38f40d628d   5 months ago    31.5MB
+kubernetesui/dashboard                    v2.1.0     9a07b5b4bfac   8 months ago    226MB
+k8s.gcr.io/etcd                           3.4.13-0   0369cf4303ff   12 months ago   253MB
+k8s.gcr.io/coredns                        1.7.0      bfe3a36ebd25   14 months ago   45.2MB
+kubernetesui/metrics-scraper              v1.0.4     86262685d9ab   17 months ago   36.9MB
+k8s.gcr.io/pause                          3.2        80d28bedfe5d   18 months ago   683kB
+```
+
 
 ## Download Spring Cloud Gateway for Kubernetes 
 
-1. Download the [Spring Cloud Gateway for Kubernetes from Tanzu Net](https://network.pivotal.io/products/spring-cloud-gateway-for-kubernetes). This workshop
-is tested with version 1.0.0 so make sure to download 1.0.x release. 
+We have downladed [Spring Cloud Gateway for Kubernetes from Tanzu Net](https://network.pivotal.io/products/spring-cloud-gateway-for-kubernetes) you can 
+find it extracted in `/home/ubuntu/Downloads/spring-cloud-gateway-k8s-1.0.2` 
 
-2. Extract the downloaded tar.gz file `tar zxf spring-cloud-gateway-k8s-1.0.0.tgz` you will find the files shown below.
+2. execute the command  `cd /home/ubuntu/Downloads/spring-cloud-gateway-k8s-1.0.2`
+
+3. Explore the directory structure using by executing the `tree` command you should see output below
+
 ```text
-.
+├── dashboards
+│   ├── grafana-spring-cloud-gateway-for-kubernetes.json
+│   └── wavefront-spring-cloud-gateway-for-kubernetes.json
 ├── helm
-│   └── spring-cloud-gateway-1.0.0.tgz
+│   ├── scg-image-values.yaml
+│   └── spring-cloud-gateway-1.0.2.tgz
 ├── images
-│   ├── gateway-1.0.0.tar
-│   └── scg-operator-1.0.0.tar
+│   ├── gateway-1.0.2.tar
+│   └── scg-operator-1.0.2.tar
+├── load-images.sh
 └── scripts
     ├── install-spring-cloud-gateway.sh
     └── relocate-images.sh
-
-3 directories, 5 files
 ```
 3. Inspect the contents of the `images` folder. Notice it contains two container images packaged as `.tar` files. 
-   the script located in `scripts/relocate-images.sh` is used to publish `gateway-1.0.0.tar` and 
-   `scg-operator-1.0.0.tar` images into a private container registry accessible from the kubernetes cluster you 
+   the script located in `scripts/relocate-images.sh` is used to publish `gateway-1.0.2.tar` and 
+   `scg-operator-1.0.2.tar` images into a private container registry accessible from the kubernetes cluster you 
    deploy the spring cloud gateway on.
 
 4. Inspect the `helm` chart folder and notice that it contains a gzipped helm chart. This will 
@@ -68,95 +108,90 @@ is tested with version 1.0.0 so make sure to download 1.0.x release.
 
 ## Load the SCGW container images into docker 
 
-In a production deployment we would run the `scripts/relocate-images.sh` to publish the SCGW container images 
-to a private container registry accessible from the k8s cluster that will be running SCGW. In this workshop
-we are using Docker Desktop integrated Kubernetes, so we only need to load the container images into the local
-docker desktop. 
+In a production depolyment you will publish the operator image and the gateway image into a private regstiry.
+For this lab we are going to use the registry that is native to minikube to keep things simple, we have 
+prepared shell script to load the images to the registry for you. 
 
-1.  execute the command `docker load --input images/scg-operator-1.0.0.tar` to load the spring cloud gateway operator
-container image into docker desktop, you should get output similar to the one below.
+1. make sure you are in the directory `~/Downloads/spring-cloud-gateway-k8s-1.0.2` 
 
-````text
- 2021-03-04 14:05:38 ⌚  asaikali-a01 in ~/Downloads/spring-cloud-gateway-k8s-1.0.0
-docker load --input images/scg-operator-1.0.0.tar 
-c95d2191d777: Loading layer [==================================================>]  65.62MB/65.62MB
-27502392e386: Loading layer [==================================================>]  15.87kB/15.87kB
-9f10818f1f96: Loading layer [==================================================>]  3.072kB/3.072kB
-3531017a5b38: Loading layer [==================================================>]  3.072kB/3.072kB
-f2891f6d1a76: Loading layer [==================================================>]  25.73MB/25.73MB
-d56456d8b2d1: Loading layer [==================================================>]  414.2kB/414.2kB
-6dd14550f862: Loading layer [==================================================>]  128.9MB/128.9MB
-576e5f5696c6: Loading layer [==================================================>]  2.362MB/2.362MB
-a8b1ccd16ecc: Loading layer [==================================================>]  583.7kB/583.7kB
-76dc679a925b: Loading layer [==================================================>]  3.584kB/3.584kB
-Loaded image: dev.registry.pivotal.io/spring-cloud-gateway/scg-operator:1.0.0
-````
-
-2. execute the command `docker load --input images/gateway-1.0.0.tar` to load the spring cloud gateway container image
-into the docker desktop, you should get output similar to the one below. 
+1. execute the shell script `./load-images.sh` this can take a few minutes to complete. you will see output
+   similar to the one below
 
 ```text
-2021-03-04 14:06:34 ⌚  asaikali-a01 in ~/Downloads/spring-cloud-gateway-k8s-1.0.0
-docker load --input images/gateway-1.0.0.tar 
-cf8abc18e2f4: Loading layer [==================================================>]  1.406MB/1.406MB
-17496f83a998: Loading layer [==================================================>]   1.67MB/1.67MB
+21639b09744f: Loading layer [==================================================>]  65.51MB/65.51MB
+b6ae40cff175: Loading layer [==================================================>]  3.072kB/3.072kB
+82c4776d33ef: Loading layer [==================================================>]  26.32MB/26.32MB
+ca8be400e8e5: Loading layer [==================================================>]  414.2kB/414.2kB
+1779dee469f5: Loading layer [==================================================>]  3.391MB/3.391MB
+e2109e6b9be5: Loading layer [==================================================>]  4.304MB/4.304MB
 ec0381c8f321: Loading layer [==================================================>]  6.656kB/6.656kB
-c220513292ef: Loading layer [==================================================>]  143.9MB/143.9MB
+207a6aa9b3e2: Loading layer [==================================================>]  144.2MB/144.2MB
 0b18b1f120f4: Loading layer [==================================================>]   3.05MB/3.05MB
-ab39aa8fd003: Loading layer [==================================================>]   5.12kB/5.12kB
-410f6d58e75f: Loading layer [==================================================>]  750.1kB/750.1kB
-c2e9ddddd4ef: Loading layer [==================================================>]  56.32kB/56.32kB
+7fbc97c38fad: Loading layer [==================================================>]   5.12kB/5.12kB
+f0ee16238e8a: Loading layer [==================================================>]   1.61MB/1.61MB
+aa7edff7133e: Loading layer [==================================================>]  56.32kB/56.32kB
 fcc507beb4cc: Loading layer [==================================================>]  4.096kB/4.096kB
-c5ddeafb7442: Loading layer [==================================================>]  47.94MB/47.94MB
-3c14fe2f1177: Loading layer [==================================================>]  294.4kB/294.4kB
+273d10576e70: Loading layer [==================================================>]  60.19MB/60.19MB
+6ca77678afd9: Loading layer [==================================================>]    299kB/299kB
 5f70bf18a086: Loading layer [==================================================>]  1.024kB/1.024kB
-b9ebca432449: Loading layer [==================================================>]    171kB/171kB
-576e5f5696c6: Loading layer [==================================================>]  2.362MB/2.362MB
-dedb8f01988f: Loading layer [==================================================>]  651.8kB/651.8kB
+80165ef615c5: Loading layer [==================================================>]  916.5kB/916.5kB
+888ed16fa8d4: Loading layer [==================================================>]  2.518MB/2.518MB
+c0b1daf33de4: Loading layer [==================================================>]  23.55kB/23.55kB
 1dc94a70dbaa: Loading layer [==================================================>]  3.584kB/3.584kB
-Loaded image: dev.registry.pivotal.io/spring-cloud-gateway/gateway:1.0.0
+Loaded image: registry.pivotal.io/spring-cloud-gateway-for-kubernetes/scg-operator:1.0.2
+19f70bace1fd: Loading layer [==================================================>]   5.12kB/5.12kB
+f0ee16238e8a: Loading layer [==================================================>]   1.61MB/1.61MB
+aa7edff7133e: Loading layer [==================================================>]  56.32kB/56.32kB
+fcc507beb4cc: Loading layer [==================================================>]  4.096kB/4.096kB
+85952c6e2cb5: Loading layer [==================================================>]  60.81MB/60.81MB
+6ca77678afd9: Loading layer [==================================================>]    299kB/299kB
+5f70bf18a086: Loading layer [==================================================>]  1.024kB/1.024kB
+9bb4ef4745e1: Loading layer [==================================================>]  348.7kB/348.7kB
+888ed16fa8d4: Loading layer [==================================================>]  2.518MB/2.518MB
+95ae23bf8138: Loading layer [==================================================>]  34.82kB/34.82kB
+1dc94a70dbaa: Loading layer [==================================================>]  3.584kB/3.584kB
+Loaded image: registry.pivotal.io/spring-cloud-gateway-for-kubernetes/gateway:1.0.2
 ```
 
 3. check your local docker images `docker images` and look for spring cloud gateway images. You should output similar
 to below.
    
 ```text
-docker images 
-REPOSITORY                                                  TAG        IMAGE ID       CREATED         SIZE
-dev.registry.pivotal.io/spring-cloud-gateway/scg-operator   1.0.0      35abc5be0038   41 years ago    219MB
-dev.registry.pivotal.io/spring-cloud-gateway/gateway        1.0.0      0c2293e5647c   41 years ago    289M
+REPOSITORY                                                             TAG        IMAGE ID       CREATED         SIZE
+k8s.gcr.io/kube-proxy                                                  v1.20.10   945c9bce487a   2 weeks ago     99.7MB
+k8s.gcr.io/kube-apiserver                                              v1.20.10   644cadd07add   2 weeks ago     122MB
+k8s.gcr.io/kube-controller-manager                                     v1.20.10   2f450864515d   2 weeks ago     116MB
+k8s.gcr.io/kube-scheduler                                              v1.20.10   4c9be8dc650b   2 weeks ago     47.3MB
+gcr.io/k8s-minikube/storage-provisioner                                v5         6e38f40d628d   5 months ago    31.5MB
+kubernetesui/dashboard                                                 v2.1.0     9a07b5b4bfac   8 months ago    226MB
+k8s.gcr.io/etcd                                                        3.4.13-0   0369cf4303ff   12 months ago   253MB
+k8s.gcr.io/coredns                                                     1.7.0      bfe3a36ebd25   14 months ago   45.2MB
+kubernetesui/metrics-scraper                                           v1.0.4     86262685d9ab   17 months ago   36.9MB
+k8s.gcr.io/pause                                                       3.2        80d28bedfe5d   18 months ago   683kB
+registry.pivotal.io/spring-cloud-gateway-for-kubernetes/gateway        1.0.2      d2eb85620d05   41 years ago    308MB
+registry.pivotal.io/spring-cloud-gateway-for-kubernetes/scg-operator   1.0.2      83bf3d63ef02   41 years ago    308MB
 ```
 
 ## Install Spring Cloud Gateway Operator
 
-1. create a namespace to install spring cloud gateway into using the command `kubectl create namespace spring-cloud-gateway`
+Spring Cloud Gateway operator is installed from a helm chart. We have configured the helm chart to use 
+the images we loaded in the previous section. 
 
-1. The spring cloud gateway operator is installed using helm. We will need to create a `scg-image-values.yaml` 
-   file pointing at the  registry containing the SCGW container images. `scg-image-values.yaml` file is normally 
-   generated when the `scripts/relocate-images.sh` is run. We did not run the script as we don't have private container
-   registry to use during the workshop so will generate `scg-image-values.yaml` manually. In the `helm` folder 
-   create a file called `scg-image-values.yaml` with the content below
-   
+1. execute the command `cat helm/scg-image-values.yaml` you should see the output below
 ```yaml
 gateway:
-   image: "dev.registry.pivotal.io/spring-cloud-gateway/gateway:1.0.0"
+   image: "registry.pivotal.io/spring-cloud-gateway-for-kubernetes/gateway:1.0.2"
 scg-operator:
-   image: "dev.registry.pivotal.io/spring-cloud-gateway/scg-operator:1.0.0"
+   image: "registry.pivotal.io/spring-cloud-gateway-for-kubernetes/scg-operator:1.0.2"
 ```
-
-In the previous section we loaded the scgw container images to docker-desktop which makes the images avilable to 
-the k8s provided by docker desktop, making our lab simpler to run on a laptop. 
-
 4. Execute `./scripts/install-spring-cloud-gateway.sh` you should see output similar to below 
 ```text
- 2021-03-04 14:10:49 ⌚  asaikali-a01 in ~/Downloads/spring-cloud-gateway-k8s-1.0.0
-○ → ./scripts/install-spring-cloud-gateway.sh
-Installing Spring Cloud Gateway...
-chart tarball: spring-cloud-gateway-1.0.0.tgz
+chart tarball: spring-cloud-gateway-1.0.2.tgz
 chart name: spring-cloud-gateway
+Waiting up to 2m for helm installation to complete
 Release "spring-cloud-gateway" does not exist. Installing it now.
 NAME: spring-cloud-gateway
-LAST DEPLOYED: Thu Mar  4 14:18:52 2021
+LAST DEPLOYED: Wed Sep  1 04:36:56 2021
 NAMESPACE: spring-cloud-gateway
 STATUS: deployed
 REVISION: 1
@@ -164,7 +199,18 @@ TEST SUITE: None
 NOTES:
 This chart contains the Kubernetes operator for Spring Cloud Gateway.
 Install the chart spring-cloud-gateway-crds before installing this chart
-Finished installing Spring Cloud Gateway
+
+Checking Operator pod state 
+✔ Operator pod is running
+
+Checking deployment replicas 
+✔ Operator deployment is ready
+
+Checking custom resource definitions 
+✓ springcloudgatewaymappings.tanzu.vmware.com successfully installed
+✓ springcloudgatewayrouteconfigs.tanzu.vmware.com successfully installed
+✓ springcloudgateways.tanzu.vmware.com successfully installed
+
 ```
 
 5. execute the command  `kubectl get all -n spring-cloud-gateway` you should see a pod running the spring cloud gateway 
@@ -277,7 +323,7 @@ Forwarding from [::1]:8080 -> 8080
    just the start. 
    
 
-## Deploy Animal Rescue Sample Application (Optional)
+## Deploy Animal Rescue Sample Application (SKIP we will doing a demo of this)
 
 The [animal rescue](https://github.com/spring-cloud-services-samples/animal-rescue/) sample 
 application demonstrate many  commonly used features of spring cloud gateway. To deploy 
@@ -341,7 +387,7 @@ statefulset.apps/gateway-demo   2/2     6m54s
    with a Google account and then you will be sent back to the application where you will 
    be able to see the userid in the top right corner. 
 
-## Delete spring cloud gateway
+## Delete spring cloud gateway (informational optional)
 
 1. delete the demo gateway `kubectl delete -f demo`
 1. delete the demo gateway `kustomize build ./animal-rescue/ | kubectl delete -f -`
