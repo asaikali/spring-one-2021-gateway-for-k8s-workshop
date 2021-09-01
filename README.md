@@ -8,7 +8,7 @@ A guided tutorial for experimenting with Tanzu Spring Cloud Gateway on minikube.
 We will use minikube for this lab, configured to run with 8 CPUs and 16GB of RAM. 
 
 1. Open a terminal window
-2. rung the shell script `./start-minkube.sh` to launch minikube, this step can take a couple of minutes, you know it worked when
+2. run the shell script `./start-minkube.sh` to launch minikube, this step can take a couple of minutes, you know it worked when
 you see output similar to below.
 
 ```
@@ -242,6 +242,9 @@ springcloudgateways.tanzu.vmware.com              2021-03-04T05:47:20Z
 ```
 
 ## Define a gateway instance 
+
+Go back to the place where you checked out this repo, E.G.:
+`cd ~/spring-one-2021-gateway-for-k8s-workshop`
 
 1. Inspect the `demo/my-gateway.yml` file it contains the YAML shown below which defines 
 a spring cloud gateway instance.
